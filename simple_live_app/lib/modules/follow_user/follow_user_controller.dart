@@ -40,6 +40,7 @@ class FollowUserController extends BasePageController<FollowUser> {
     SortMethod.recently: "最近添加",
     SortMethod.userNameASC: "用户名A-Z",
     SortMethod.userNameDESC: "用户名Z-A",
+    SortMethod.tag: "自定义标签",
   };
 
   // 关注列表样式

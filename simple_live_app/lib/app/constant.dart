@@ -59,6 +59,7 @@ enum SortMethod {
   recently,
   userNameASC,
   userNameDESC,
+  tag,
 }
 
 extension SortMethodStore on SortMethod {

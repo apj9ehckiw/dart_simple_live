@@ -533,6 +533,13 @@ class FollowService extends GetxService {
       valueGetter: (item) => item.romanName ?? "",
       ascending: false,
     );
+    var tagCondition = SortCondition<FollowUser>(
+      valueGetter: (item) {
+        return followTagList.indexWhere((followTag) {
+          return followTag.tag == item.tag;
+        });
+      },
+    );
     switch (sortMethod) {
       case SortMethod.watchDuration:
         list.dynamicSort([liveCondition, watchDurationCondition]);
@@ -544,6 +551,8 @@ class FollowService extends GetxService {
         list.dynamicSort([liveCondition, userNameASCCondition]);
       case SortMethod.userNameDESC:
         list.dynamicSort([liveCondition, userNameDESCCondition]);
+      case SortMethod.tag:
+        list.dynamicSort([liveCondition, tagCondition, watchDurationCondition]);
     }
   }
 
