@@ -537,7 +537,7 @@ class FollowService extends GetxService {
       case SortMethod.watchDuration:
         list.dynamicSort([liveCondition, watchDurationCondition]);
       case SortMethod.siteId:
-        list.dynamicSort([liveCondition, siteIdCondition]);
+        list.dynamicSort([liveCondition, siteIdCondition, watchDurationCondition]);
       case SortMethod.recently:
         list.dynamicSort([liveCondition, recentlyCondition]);
       case SortMethod.userNameASC:
