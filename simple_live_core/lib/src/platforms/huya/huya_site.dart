@@ -233,6 +233,7 @@ class HuyaSite implements LiveSite {
 
   @override
   Future<LiveRoomDetail> getRoomDetail({required String roomId}) async {
+    // late result is dangerous, many uncertainties pose significant null-safety risks
     late LiveRoomDetail result;
     var resultText = await HttpClient.instance.getText(
       "$baseUrl/$roomId",
@@ -334,6 +335,16 @@ class HuyaSite implements LiveSite {
               lines: huyaLines,
               bitRates: huyaBiterates,
               uid: getUid(t: 13, e: 10),
+            ),
+          );
+        } else {
+          // fix: type 'Null' is not a subtype of type 'HuyaDanmakuArgs' in type cast
+          // because live-controller try to huya-danmaku.start whether online or not
+          result = result.updateDanmakuData(
+            HuyaDanmakuArgs(
+              ayyuid: 0,
+              topSid: 0,
+              subSid: 0,
             ),
           );
         }
