@@ -1,34 +1,61 @@
 import 'dart:io';
-import 'dart:ui';
 
+import 'package:flutter/scheduler.dart';
 import 'package:get/get.dart';
+import 'package:nativeapi/nativeapi.dart';
 import 'package:simple_live_app/services/local_storage_service.dart';
-import 'package:window_manager/window_manager.dart';
 
-class WindowService extends GetxService implements WindowListener {
+class WindowService extends GetxService {
   static WindowService get instance => Get.find<WindowService>();
+
+  late final WindowManager _windowManager;
+  late final Window _window;
+  Window get window => _window;
 
   bool isPIP = false;
 
-  WindowService() {
-    windowManager.addListener(this);
-  }
+  WindowService()
+      : _windowManager = WindowManager.instance,
+        _window = WindowManager.instance.getCurrent()!;
 
-  Future<void> init() async {
-    await resize();
-    WindowOptions windowOptions = WindowOptions(
-      minimumSize: Size(280, 280),
-      center: false,
-      title: "Slive",
-    );
-    windowManager.waitUntilReadyToShow(windowOptions, () async {
-      await windowManager.show();
-      await windowManager.focus();
+  void init() {
+    _window.setMinimumSize(280, 280);
+    _window.title = "Slive";
+    resize();
+    _setupEventListeners();
+
+    // 延迟显示窗口，等待 Flutter 引擎完成窗口准备
+    SchedulerBinding.instance.addPostFrameCallback((_) {
+      _window.show();
+      _window.focus();
     });
   }
 
-  Future<void> resize() async {
-    // 初始分辨率默认 1920×1080
+  void _setupEventListeners() {
+    _windowManager.addCallbackListener<WindowMovedEvent>((event) {
+      if (!isPIP) {
+        _saveBounds(_window.bounds);
+      }
+    });
+
+    _windowManager.addCallbackListener<WindowResizedEvent>((event) {
+      if (!isPIP) {
+        _saveBounds(_window.bounds);
+      }
+    });
+
+    _windowManager.addCallbackListener<WindowRestoredEvent>((event) {
+      _window.titleBarStyle = isPIP ? TitleBarStyle.hidden : TitleBarStyle.normal;
+    });
+
+    _windowManager.addCallbackListener<WindowClosedEvent>((event) {
+      if (Platform.isLinux) {
+        exit(0);
+      }
+    });
+  }
+
+  void resize() {
     final width = LocalStorageService.instance
         .getValue(LocalStorageService.kWindowWidth, 1280.0);
     final height = LocalStorageService.instance
@@ -37,70 +64,8 @@ class WindowService extends GetxService implements WindowListener {
         .getValue(LocalStorageService.kWindowX, 320.0);
     final y = LocalStorageService.instance
         .getValue(LocalStorageService.kWindowY, 180.0);
-    windowManager.setBounds(Rect.fromLTWH(x, y, width, height));
+    _window.bounds = Rect.fromLTWH(x, y, width, height);
   }
-
-  @override
-  void onWindowBlur() {}
-
-  @override
-  void onWindowClose() {
-    if (Platform.isLinux) {
-      exit(0);
-    }
-  }
-
-  @override
-  void onWindowDocked() {}
-
-  @override
-  void onWindowEnterFullScreen() {}
-
-  @override
-  void onWindowEvent(String eventName) {}
-
-  @override
-  void onWindowFocus() {}
-
-  @override
-  void onWindowLeaveFullScreen() {}
-
-  @override
-  void onWindowMaximize() {}
-
-  @override
-  void onWindowMinimize() {}
-
-  @override
-  Future<void> onWindowMove() async {}
-
-  @override
-  Future<void> onWindowMoved() async {
-    if (!isPIP) {
-      final bounds = await windowManager.getBounds();
-      _saveBounds(bounds);
-    }
-  }
-
-  @override
-  Future<void> onWindowResize() async {}
-
-  @override
-  Future<void> onWindowResized() async {
-    if (!isPIP) {
-      final bounds = await windowManager.getBounds();
-      _saveBounds(bounds);
-    }
-  }
-
-  @override
-  void onWindowRestore() {}
-
-  @override
-  void onWindowUndocked() {}
-
-  @override
-  void onWindowUnmaximize() {}
 
   void _saveBounds(Rect bounds) {
     LocalStorageService.instance

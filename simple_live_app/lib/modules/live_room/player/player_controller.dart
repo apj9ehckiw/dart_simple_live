@@ -23,7 +23,7 @@ import 'package:simple_live_app/app/custom_throttle.dart';
 import 'package:simple_live_app/app/log.dart';
 import 'package:simple_live_app/app/utils.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
-import 'package:window_manager/window_manager.dart';
+import 'package:nativeapi/nativeapi.dart';
 
 mixin PlayerMixin {
   GlobalKey<VideoState> globalPlayerKey = GlobalKey<VideoState>();
@@ -299,7 +299,7 @@ mixin PlayerSystemMixin on PlayerMixin, PlayerStateMixin, PlayerDanmakuMixin {
   }
 
   /// 进入全屏
-  void enterFullScreen() async {
+  void enterFullScreen() {
     fullScreenState.value = true;
     if (Platform.isAndroid || Platform.isIOS) {
       //全屏
@@ -309,30 +309,21 @@ mixin PlayerSystemMixin on PlayerMixin, PlayerStateMixin, PlayerDanmakuMixin {
         setLandscapeOrientation();
       }
     } else {
-      // todo: animation isn't smooth...
-      bool isMaximized = await windowManager.isMaximized();
-      if (isMaximized) {
-        await windowManager.setFullScreen(true);
-        await windowManager.setTitleBarStyle(TitleBarStyle.hidden);
-      }
-      await windowManager.setFullScreen(true);
+      final window = WindowService.instance.window;
+      window.isFullscreen = true;
     }
     //danmakuController?.clear();
   }
 
   /// 退出全屏
-  void exitFull() async {
+  void exitFull() {
     if (Platform.isAndroid || Platform.isIOS) {
       SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge,
           overlays: SystemUiOverlay.values);
       setPortraitOrientation();
     } else {
-      bool isMaximized = await windowManager.isMaximized();
-      if (isMaximized) {
-        await windowManager.setFullScreen(false);
-        await windowManager.setTitleBarStyle(TitleBarStyle.normal);
-      }
-      windowManager.setFullScreen(false);
+      final window = WindowService.instance.window;
+      window.isFullscreen = false;
     }
     fullScreenState.value = false;
 
@@ -343,17 +334,19 @@ mixin PlayerSystemMixin on PlayerMixin, PlayerStateMixin, PlayerDanmakuMixin {
   Offset? _lastWindowPosition;
 
   ///小窗模式()
-  void enterSmallWindow() async {
+  void enterSmallWindow() {
     if (!(Platform.isAndroid || Platform.isIOS)) {
+      final window = WindowService.instance.window;
+
       fullScreenState.value = true;
       smallWindowState.value = true;
       WindowService.instance.isPIP = smallWindowState.value;
 
       // 读取窗口大小
-      _lastWindowSize = await windowManager.getSize();
-      _lastWindowPosition = await windowManager.getPosition();
+      _lastWindowSize = window.size;
+      _lastWindowPosition = window.position;
 
-      windowManager.setTitleBarStyle(TitleBarStyle.hidden);
+      window.titleBarStyle = TitleBarStyle.hidden;
       // 获取视频窗口大小
       var width = player.state.width ?? 16;
       var height = player.state.height ?? 9;
@@ -361,27 +354,27 @@ mixin PlayerSystemMixin on PlayerMixin, PlayerStateMixin, PlayerDanmakuMixin {
       // 横屏还是竖屏
       if (height > width) {
         var aspectRatio = width / height;
-        windowManager.setSize(Size(400, 400 / aspectRatio));
+        window.setSize(400, 400 / aspectRatio);
       } else {
         var aspectRatio = height / width;
-        windowManager.setSize(Size(280 / aspectRatio, 280));
+        window.setSize(280 / aspectRatio, 280);
       }
-
-      windowManager.setAlwaysOnTop(true);
+      window.isAlwaysOnTop = true;
     }
   }
 
   ///退出小窗模式()
   void exitSmallWindow() {
     if (!(Platform.isAndroid || Platform.isIOS)) {
+      final window = WindowService.instance.window;
+
       fullScreenState.value = false;
       smallWindowState.value = false;
       WindowService.instance.isPIP = smallWindowState.value;
-      windowManager.setTitleBarStyle(TitleBarStyle.normal);
-      windowManager.setSize(_lastWindowSize!);
-      windowManager.setPosition(_lastWindowPosition!);
-      windowManager.setAlwaysOnTop(false);
-      //windowManager.setAlignment(Alignment.center);
+      window.titleBarStyle = TitleBarStyle.normal; // 存在bug style需要在一次全屏后生效 暂时无法迁移
+      window.setSize(_lastWindowSize!.width, _lastWindowSize!.height);
+      window.setPosition(_lastWindowPosition!.dx, _lastWindowPosition!.dy);
+      window.isAlwaysOnTop = false;
     }
   }
 

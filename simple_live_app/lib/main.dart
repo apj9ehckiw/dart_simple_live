@@ -40,7 +40,6 @@ import 'package:simple_live_app/services/window_service.dart';
 import 'package:simple_live_app/src/rust/frb_generated.dart';
 import 'package:simple_live_app/widgets/status/app_loadding_widget.dart';
 import 'package:simple_live_core/simple_live_core.dart';
-import 'package:window_manager/window_manager.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -75,7 +74,6 @@ Future initWindow() async {
   if (!(Platform.isMacOS || Platform.isWindows || Platform.isLinux)) {
     return;
   }
-  await windowManager.ensureInitialized();
   WindowService.instance.init();
 }
 
@@ -218,8 +216,8 @@ class MyApp extends StatelessWidget {
                           instance.onTapDown = (TapDownDetails details) async {
                             //如果处于全屏状态，退出全屏
                             if (!Platform.isAndroid && !Platform.isIOS) {
-                              if (await windowManager.isFullScreen()) {
-                                await windowManager.setFullScreen(false);
+                              if (WindowService.instance.window.isFullscreen) {
+                                WindowService.instance.window.isFullscreen = false;
                                 return;
                               }
                             }
@@ -236,8 +234,8 @@ class MyApp extends StatelessWidget {
                           // ESC退出全屏
                           // 如果处于全屏状态，退出全屏
                           if (!Platform.isAndroid && !Platform.isIOS) {
-                            if (await windowManager.isFullScreen()) {
-                              await windowManager.setFullScreen(false);
+                            if (WindowService.instance.window.isFullscreen) {
+                              WindowService.instance.window.isFullscreen = false;
                               EventBus.instance
                                   .emit(EventBus.kEscapePressed, 0);
                               return;

@@ -15,8 +15,8 @@ import 'package:simple_live_app/modules/settings/appstyle_settings/appstyle_sett
 import 'package:simple_live_app/modules/settings/danmu_settings_page.dart';
 import 'package:simple_live_app/services/follow_service.dart';
 import 'package:simple_live_app/widgets/desktop_refresh_button.dart';
+import 'package:simple_live_app/services/window_service.dart';
 import 'package:simple_live_app/widgets/follow_user_item.dart';
-import 'package:window_manager/window_manager.dart';
 
 Widget playerControls(
   VideoState videoState,
@@ -39,7 +39,10 @@ Widget playerControls(
 
 Widget buildDragToMoveArea({required Widget child}) {
   return (!Platform.isAndroid && !Platform.isIOS)
-      ? DragToMoveArea(
+      ? GestureDetector(
+          onPanStart: (_) {
+            WindowService.instance.window.startDragging();
+          },
           child: child,
         )
       : child;
