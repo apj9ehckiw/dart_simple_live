@@ -43,14 +43,19 @@ class LiquidGlassViewFactory: NSObject, FlutterPlatformViewFactory {
   /// 通过 `NSClassFromString` 动态查找类，避免强依赖 iOS 26 SDK，旧版 Xcode 亦可编译。
   static func makeGlassEffect() -> UIVisualEffect {
     if #available(iOS 26.0, *) {
-      if let glassClass = NSClassFromString("UIGlassEffect"),
-         let glassType = glassClass as? NSObject.Type {
-        let instance = glassType.init()
+      if let cls = NSClassFromString("UIGlassEffect") as? NSObject.Type {
+        // 等价于 ObjC 的 [UIGlassEffect alloc] init]，调用子类重写的 init
+        let instance = cls.init()
         if let glass = instance as? UIVisualEffect {
+          NSLog("[LiquidGlass] using UIGlassEffect (iOS %@)", UIDevice.current.systemVersion)
           return glass
         }
+        NSLog("[LiquidGlass] UIGlassEffect init did not yield UIVisualEffect, fallback to blur")
+      } else {
+        NSLog("[LiquidGlass] UIGlassEffect class not found, fallback to blur")
       }
     }
+    NSLog("[LiquidGlass] using UIBlurEffect(systemUltraThinMaterial) fallback")
     return UIBlurEffect(style: .systemUltraThinMaterial)
   }
 }

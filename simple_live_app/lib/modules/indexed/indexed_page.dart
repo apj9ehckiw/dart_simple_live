@@ -11,54 +11,63 @@ class IndexedPage extends GetView<IndexedController> {
 
   @override
   Widget build(BuildContext context) {
-    final supportsGlass = DeviceInfoService.instance.supportsLiquidGlass;
     return OrientationBuilder(
       builder: (context, orientation) {
+        final supportsGlass =
+            DeviceInfoService.instance.supportsLiquidGlass;
+        final useGlassTab =
+            supportsGlass && orientation == Orientation.portrait;
         return Scaffold(
-          // iOS 26+ 液态玻璃 Tab 栏需要内容延伸至底部，以便 BackdropFilter 模糊滚动内容
-          extendBody: supportsGlass && orientation == Orientation.portrait,
-          body: Row(
-            children: [
-              Visibility(
-                visible: orientation == Orientation.landscape,
-                child: Obx(
-                  () => NavigationRail(
-                    selectedIndex: controller.index.value,
-                    onDestinationSelected: controller.setIndex,
-                    labelType: NavigationRailLabelType.none,
-                    destinations: controller.items
-                        .map(
-                          (item) => NavigationRailDestination(
-                            icon: Icon(item.iconData),
-                            label: Text(item.title),
-                            padding: AppStyle.edgeInsetsV8,
-                          ),
-                        )
-                        .toList(),
+          // iOS 26+ 液态玻璃 Tab 栏：内容延伸至底部，使原生 UIGlassEffect 能折射滚动内容
+          extendBody: useGlassTab,
+          body: MediaQuery(
+            // 移除底部 padding，避免内层各页面 Scaffold 消费 bottom padding
+            // 而把内容截断在 Tab 栏上方，导致 Tab 栏后方无内容可折射
+            data: MediaQuery.of(context)
+                .removePadding(removeBottom: useGlassTab),
+            child: Row(
+              children: [
+                Visibility(
+                  visible: orientation == Orientation.landscape,
+                  child: Obx(
+                    () => NavigationRail(
+                      selectedIndex: controller.index.value,
+                      onDestinationSelected: controller.setIndex,
+                      labelType: NavigationRailLabelType.none,
+                      destinations: controller.items
+                          .map(
+                            (item) => NavigationRailDestination(
+                              icon: Icon(item.iconData),
+                              label: Text(item.title),
+                              padding: AppStyle.edgeInsetsV8,
+                            ),
+                          )
+                          .toList(),
+                    ),
                   ),
                 ),
-              ),
-              Expanded(
-                child: Obx(
-                  () => Container(
-                    decoration: BoxDecoration(
-                      border: Border(
-                        left: orientation == Orientation.landscape
-                            ? BorderSide(
-                                color: Colors.grey.withAlpha(50),
-                                width: 1,
-                              )
-                            : BorderSide.none,
+                Expanded(
+                  child: Obx(
+                    () => Container(
+                      decoration: BoxDecoration(
+                        border: Border(
+                          left: orientation == Orientation.landscape
+                              ? BorderSide(
+                                  color: Colors.grey.withAlpha(50),
+                                  width: 1,
+                                )
+                              : BorderSide.none,
+                        ),
+                      ),
+                      child: IndexedStack(
+                        index: controller.index.value,
+                        children: controller.pages,
                       ),
                     ),
-                    child: IndexedStack(
-                      index: controller.index.value,
-                      children: controller.pages,
-                    ),
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
           bottomNavigationBar: Visibility(
             visible: orientation == Orientation.portrait,
