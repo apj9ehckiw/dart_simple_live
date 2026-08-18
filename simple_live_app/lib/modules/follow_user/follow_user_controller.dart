@@ -88,14 +88,16 @@ class FollowUserController extends BasePageController<FollowUser> {
       return Future.value([]);
     }
     if (filterMode.value.tag == "全部") {
-      return FollowService.instance.followList.value;
+      // 返回副本，避免与 FollowService.followList 共享底层 List 引用，
+      // 否则后续 assignAll 会发生自清空导致页面空白
+      return FollowService.instance.followList.toList();
     } else if (filterMode.value.tag == "直播中") {
-      return FollowService.instance.liveList.value;
+      return FollowService.instance.liveList.toList();
     } else if (filterMode.value.tag == "未开播") {
-      return FollowService.instance.notLiveList.value;
+      return FollowService.instance.notLiveList.toList();
     } else {
       FollowService.instance.filterDataByTag(filterMode.value);
-      return FollowService.instance.curTagFollowList.value;
+      return FollowService.instance.curTagFollowList.toList();
     }
   }
 
@@ -114,14 +116,16 @@ class FollowUserController extends BasePageController<FollowUser> {
     bool hideOffline = AppSettingsController.instance.hideOfflineFollow.value;
 
     if (filterMode.value.tag == "全部") {
-      list.assignAll(FollowService.instance.followList.value);
+      // 使用副本赋值，避免 list 与 FollowService 列表共享同一底层 List 引用，
+      // 否则 assignAll 内部 clear() 会把源数据一并清空，导致页面空白
+      list.assignAll(FollowService.instance.followList.toList());
     } else if (filterMode.value.tag == "直播中") {
-      list.assignAll(FollowService.instance.liveList.value);
+      list.assignAll(FollowService.instance.liveList.toList());
     } else if (filterMode.value.tag == "未开播") {
-      list.assignAll(FollowService.instance.notLiveList.value);
+      list.assignAll(FollowService.instance.notLiveList.toList());
     } else {
       FollowService.instance.filterDataByTag(filterMode.value);
-      list.assignAll(FollowService.instance.curTagFollowList);
+      list.assignAll(FollowService.instance.curTagFollowList.toList());
     }
 
     if (hideOffline && filterMode.value.tag != "未开播") {
