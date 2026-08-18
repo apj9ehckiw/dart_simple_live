@@ -29,6 +29,7 @@ import 'package:simple_live_app/routes/app_pages.dart';
 import 'package:simple_live_app/routes/route_path.dart';
 import 'package:simple_live_app/services/bilibili_account_service.dart';
 import 'package:simple_live_app/services/db_service.dart';
+import 'package:simple_live_app/services/device_info_service.dart';
 import 'package:simple_live_app/services/platform_service.dart';
 import 'package:simple_live_app/services/firebase_service.dart' as app;
 import 'package:simple_live_app/services/follow_service.dart';
@@ -88,6 +89,8 @@ Future initServices() async {
   Log.d("Init LocalStorage Service");
   await Get.put(LocalStorageService()).init();
   await Get.put(DBService()).init();
+  //设备信息（同步检测 iOS 版本，供液态玻璃判断）
+  Get.put(DeviceInfoService());
   //初始化设置控制器
   Get.put(AppSettingsController());
 

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:simple_live_app/app/app_style.dart';
+import 'package:simple_live_app/services/device_info_service.dart';
+import 'package:simple_live_app/widgets/liquid_glass_tab_bar.dart';
 
 import 'indexed_controller.dart';
 
@@ -9,9 +11,12 @@ class IndexedPage extends GetView<IndexedController> {
 
   @override
   Widget build(BuildContext context) {
+    final supportsGlass = DeviceInfoService.instance.supportsLiquidGlass;
     return OrientationBuilder(
       builder: (context, orientation) {
         return Scaffold(
+          // iOS 26+ 液态玻璃 Tab 栏需要内容延伸至底部，以便 BackdropFilter 模糊滚动内容
+          extendBody: supportsGlass && orientation == Orientation.portrait,
           body: Row(
             children: [
               Visibility(
@@ -58,11 +63,9 @@ class IndexedPage extends GetView<IndexedController> {
           bottomNavigationBar: Visibility(
             visible: orientation == Orientation.portrait,
             child: Obx(
-              () => NavigationBar(
+              () => LiquidGlassTabBar(
                 selectedIndex: controller.index.value,
                 onDestinationSelected: controller.setIndex,
-                height: 56,
-                labelBehavior: NavigationDestinationLabelBehavior.alwaysHide,
                 destinations: controller.items
                     .map(
                       (item) => NavigationDestination(

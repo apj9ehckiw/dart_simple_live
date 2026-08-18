@@ -347,6 +347,12 @@ class FollowService extends GetxService {
     }
     _buildDormantList();
     getAllTagList();
+    // 无论列表是否为空，都通知订阅者数据已就绪。
+    // 修复 iOS 冷启动时 FollowUserController 首次加载数据为空的问题：
+    // initFollowList 是异步的，Get.put 不会 await onInit，
+    // 若 FollowUserController 在 initFollowList 完成后才订阅 stream，
+    // 缺少此事件会导致列表永远停留在空白状态。
+    _updatedListController.add(0);
   }
 
   /// 构建休眠用户列表

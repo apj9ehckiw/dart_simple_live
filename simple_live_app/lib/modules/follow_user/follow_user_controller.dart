@@ -64,6 +64,14 @@ class FollowUserController extends BasePageController<FollowUser> {
     );
 
     sortMethod = AppSettingsController.instance.followSortMethod;
+
+    // 主动从 FollowService 同步当前数据，避免依赖 firstRefresh 的时序。
+    // iOS 冷启动时 FollowService.onInit 可能尚未完成，followList 为空；
+    // 若此时 firstRefresh 先返回空列表，pageEmpty 会置为 true 导致页面空白。
+    // 此处预先填充 list，后续 stream 事件会进一步刷新。
+    updateTagList();
+    filterData();
+
     super.onInit();
   }
 
@@ -118,6 +126,13 @@ class FollowUserController extends BasePageController<FollowUser> {
 
     if (hideOffline && filterMode.value.tag != "未开播") {
       list.retainWhere((user) => user.liveStatus.value == 2);
+    }
+
+    // 同步空白遮罩状态。filterData 可能由 stream 事件在 loadData 之后触发，
+    // 此时 followList 已有数据但 pageEmpty 仍为 true（loadData 在 followList
+    // 为空时设置），导致 AppEmptyWidget 遮罩覆盖在列表上方，页面呈现空白。
+    if (list.isNotEmpty) {
+      pageEmpty.value = false;
     }
   }
 
