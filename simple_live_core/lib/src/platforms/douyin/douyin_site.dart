@@ -3,6 +3,7 @@ import 'dart:math';
 
 import 'package:simple_live_core/simple_live_core.dart';
 import 'package:simple_live_core/src/common/convert_helper.dart';
+import 'package:simple_live_core/src/common/core_error.dart';
 import 'package:simple_live_core/src/common/http_client.dart';
 import 'package:simple_live_core/src/platforms/douyin/douyin_utils.dart';
 import 'douyin_request_params.dart';
@@ -253,16 +254,23 @@ class DouyinSite implements LiveSite {
   Future<LiveRoomDetail> getRoomDetailByRoomId(String roomId) async {
     // 读取房间信息
     var roomData = await _getRoomDataByRoomId(roomId);
+    var room = roomData["data"]?["room"];
+
+    if (room == null) {
+      throw CoreError("无法获取直播间数据，直播间不存在或主播未开播");
+    }
 
     // 通过房间信息获取WebRid
-    var webRid = roomData["data"]["room"]["owner"]["web_rid"].toString();
+    var webRid = room["owner"]?["web_rid"]?.toString() ?? "";
+    if (webRid.isEmpty) {
+      throw CoreError("无法获取直播间数据，直播间不存在或主播未开播");
+    }
 
     // 读取用户唯一ID，用于弹幕连接
     // 似乎这个参数不是必须的，先随机生成一个
     //var userUniqueId = await _getUserUniqueId(webRid);
     var userUniqueId = generateRandomNumber(12).toString();
 
-    var room = roomData["data"]["room"];
     var owner = room["owner"];
 
     var status = asT<int?>(room["status"]) ?? 0;
@@ -305,13 +313,115 @@ class DouyinSite implements LiveSite {
   /// - [webRid] 直播间RID
   /// - 返回直播间信息
   Future<LiveRoomDetail> getRoomDetailByWebRid(String webRid) async {
+    // 先尝试Web端API（普通直播间一次请求即可获取数据）
     try {
       var result = await _getRoomDetailByWebRidApi(webRid);
       return result;
     } catch (e) {
       CoreLog.error(e);
     }
+    // Web端API获取失败（如"仅客户端观看"直播间、未开播等），
+    // 尝试移动端App接口获取数据
+    try {
+      var result = await _getRoomDetailByAppApi(webRid);
+      return result;
+    } catch (e) {
+      CoreLog.error(e);
+    }
+    // 最后尝试从直播间网页 HTML 中解析
     return await _getRoomDetailByWebRidHtml(webRid);
+  }
+
+  /// 获取主播的sec_user_id
+  /// - [webRid] 直播间RID
+  /// - 优先从Web进入API返回的user数据中获取，失败则从直播间页面HTML中获取
+  Future<String> _getSecUserId(String webRid) async {
+    // 方式1：Web进入API返回的user数据
+    try {
+      var data = await _getRoomDataByApi(webRid);
+      var user = data["user"];
+      if (user is Map && user["sec_uid"] != null) {
+        return user["sec_uid"].toString();
+      }
+    } catch (e) {
+      CoreLog.error(e);
+    }
+    // 方式2：直播间页面HTML中的主播信息
+    try {
+      var htmlData = await _getRoomDataByHtml(webRid);
+      var anchor = htmlData["roomStore"]?["roomInfo"]?["anchor"];
+      if (anchor is Map && anchor["sec_uid"] != null) {
+        return anchor["sec_uid"].toString();
+      }
+    } catch (e) {
+      CoreLog.error(e);
+    }
+    return "";
+  }
+
+  /// 通过移动端App接口获取直播间信息
+  /// 使用抖音App的webcast接口，可以获取到"仅客户端观看"直播间的数据
+  /// - [webRid] 直播间RID
+  /// - 返回直播间信息
+  Future<LiveRoomDetail> _getRoomDetailByAppApi(String webRid) async {
+    // App接口需要主播的sec_user_id参数
+    var secUserId = await _getSecUserId(webRid);
+    if (secUserId.isEmpty) {
+      throw CoreError("无法获取主播信息，该直播间可能仅支持手机客户端观看");
+    }
+
+    var queryParams = {
+      'verifyFp': 'verify_lk07kv74_QZYCUApD_xhiB_405x_Ax51_GYO9bUIyZQVf',
+      'type_id': '0',
+      'live_id': '1',
+      // 直接传入webRid，服务端会自动识别为对应的房间ID
+      'room_id': webRid,
+      'sec_user_id': secUserId,
+      'app_id': '1128',
+    };
+    var targetUrl = DouyinUtils.buildRequestUrl(
+        "https://webcast.amemv.com/webcast/room/reflow/info/", queryParams);
+    var result = await HttpClient.instance.getJson(
+      targetUrl,
+      header: await getRequestHeaders(),
+    );
+    var room = result["data"]?["room"];
+    if (room is! Map) {
+      throw CoreError(
+        "无法获取直播间数据，该直播间可能仅支持手机客户端观看或主播未开播",
+      );
+    }
+
+    var roomStatus = (asT<int?>(room["status"]) ?? 0) == 2;
+    var owner = room["owner"];
+    var roomId = room["id_str"]?.toString() ?? "";
+    var userUniqueId = generateRandomNumber(12).toString();
+
+    // 主要是为了获取cookie,用于弹幕websocket连接
+    var headers = await getRequestHeaders();
+    return LiveRoomDetail(
+      roomId: webRid,
+      title: room["title"]?.toString() ?? "",
+      cover: roomStatus
+          ? room["cover"]?["url_list"]?[0]?.toString() ?? ""
+          : "",
+      userName: owner?["nickname"]?.toString() ?? "",
+      userAvatar: owner?["avatar_thumb"]?["url_list"]?[0]?.toString() ?? "",
+      online: roomStatus
+          ? asT<int?>(room["room_view_stats"]?["display_value"]) ?? 0
+          : 0,
+      status: roomStatus,
+      url: "https://live.douyin.com/$webRid",
+      introduction: owner?["signature"]?.toString() ?? "",
+      notice: "",
+      danmakuData: DouyinDanmakuArgs(
+        webRid: webRid,
+        roomId: roomId,
+        userId: userUniqueId,
+        cookie: headers["cookie"],
+      ),
+      data: room["stream_url"] ?? {},
+    );
   }
 
   /// 通过WebRid访问直播间API，从API中获取直播间信息
@@ -320,9 +430,18 @@ class DouyinSite implements LiveSite {
   Future<LiveRoomDetail> _getRoomDetailByWebRidApi(String webRid) async {
     // 读取房间信息
     var data = await _getRoomDataByApi(webRid);
-    var roomData = data["data"][0];
+    var roomList = data["data"];
     var userData = data["user"];
-    var roomId = roomData["id_str"].toString();
+
+    // 房间数据为空，说明该直播间在网页端不可用
+    // （例如主播开启了仅手机客户端观看、主播未开播等）
+    if (roomList is! List || roomList.isEmpty) {
+      throw CoreError(
+        "无法获取直播间数据，该直播间可能仅支持手机客户端观看或主播未开播",
+      );
+    }
+    var roomData = roomList[0];
+    var roomId = roomData["id_str"]?.toString() ?? "";
 
     // 读取用户唯一ID，用于弹幕连接
     // 似乎这个参数不是必须的，先随机生成一个
@@ -337,16 +456,20 @@ class DouyinSite implements LiveSite {
     var headers = await getRequestHeaders();
     return LiveRoomDetail(
       roomId: webRid,
-      title: roomData["title"].toString(),
-      cover: roomStatus ? roomData["cover"]["url_list"][0].toString() : "",
+      title: roomData["title"]?.toString() ?? "",
+      cover: roomStatus
+          ? roomData["cover"]?["url_list"]?[0]?.toString() ?? ""
+          : "",
       userName: roomStatus
-          ? owner["nickname"].toString()
-          : userData["nickname"].toString(),
+          ? owner?["nickname"]?.toString() ??
+              userData?["nickname"]?.toString() ??
+              ""
+          : userData?["nickname"]?.toString() ?? "",
       userAvatar: roomStatus
-          ? owner["avatar_thumb"]["url_list"][0].toString()
-          : userData["avatar_thumb"]["url_list"][0].toString(),
+          ? owner?["avatar_thumb"]?["url_list"]?[0]?.toString() ?? ""
+          : userData?["avatar_thumb"]?["url_list"]?[0]?.toString() ?? "",
       online: roomStatus
-          ? asT<int?>(roomData["room_view_stats"]["display_value"]) ?? 0
+          ? asT<int?>(roomData["room_view_stats"]?["display_value"]) ?? 0
           : 0,
       status: roomStatus,
       url: "https://live.douyin.com/$webRid",
@@ -367,13 +490,23 @@ class DouyinSite implements LiveSite {
   /// - 返回直播间信息
   Future<LiveRoomDetail> _getRoomDetailByWebRidHtml(String webRid) async {
     var roomData = await _getRoomDataByHtml(webRid);
-    var roomId = roomData["roomStore"]["roomInfo"]["room"]["id_str"].toString();
-    var userUniqueId =
-        roomData["userStore"]["odin"]["user_unique_id"].toString();
+    var roomInfo = roomData["roomStore"]?["roomInfo"];
+    var room = roomInfo?["room"];
+    var anchor = roomInfo?["anchor"];
 
-    var room = roomData["roomStore"]["roomInfo"]["room"];
+    // 房间数据缺失，说明该直播间在网页端不可用
+    // （例如主播开启了仅手机客户端观看、主播未开播等）
+    if (room == null) {
+      throw CoreError(
+        "无法获取直播间数据，该直播间可能仅支持手机客户端观看或主播未开播",
+      );
+    }
+
+    var roomId = room["id_str"]?.toString() ?? "";
+    var userUniqueId =
+        roomData["userStore"]?["odin"]?["user_unique_id"]?.toString() ?? "";
+
     var owner = room["owner"];
-    var anchor = roomData["roomStore"]["roomInfo"]["anchor"];
     var roomStatus = (asT<int?>(room["status"]) ?? 0) == 2;
 
     // 主要是为了获取cookie,用于弹幕websocket连接
@@ -381,16 +514,20 @@ class DouyinSite implements LiveSite {
 
     return LiveRoomDetail(
       roomId: webRid,
-      title: room["title"].toString(),
-      cover: roomStatus ? room["cover"]["url_list"][0].toString() : "",
+      title: room["title"]?.toString() ?? "",
+      cover: roomStatus
+          ? room["cover"]?["url_list"]?[0]?.toString() ?? ""
+          : "",
       userName: roomStatus
-          ? owner["nickname"].toString()
-          : anchor["nickname"].toString(),
+          ? owner?["nickname"]?.toString() ??
+              anchor?["nickname"]?.toString() ??
+              ""
+          : anchor?["nickname"]?.toString() ?? "",
       userAvatar: roomStatus
-          ? owner["avatar_thumb"]["url_list"][0].toString()
-          : anchor["avatar_thumb"]["url_list"][0].toString(),
+          ? owner?["avatar_thumb"]?["url_list"]?[0]?.toString() ?? ""
+          : anchor?["avatar_thumb"]?["url_list"]?[0]?.toString() ?? "",
       online: roomStatus
-          ? asT<int?>(room["room_view_stats"]["display_value"]) ?? 0
+          ? asT<int?>(room["room_view_stats"]?["display_value"]) ?? 0
           : 0,
       status: roomStatus,
       url: "https://live.douyin.com/$webRid",
@@ -460,13 +597,28 @@ class DouyinSite implements LiveSite {
             .firstMatch(result)
             ?.group(0) ??
         "";
+    if (renderData.isEmpty) {
+      throw CoreError("无法解析直播间页面数据，该直播间可能仅支持手机客户端观看");
+    }
     var str = renderData
         .trim()
         .replaceAll('\\"', '"')
         .replaceAll(r"\\", r"\")
         .replaceAll(']\\n', "");
-    var renderDataJson = json.decode(str);
-    return renderDataJson["state"];
+    dynamic renderDataJson;
+    try {
+      renderDataJson = json.decode(str);
+    } catch (_) {
+      throw CoreError("无法解析直播间页面数据，该直播间可能仅支持手机客户端观看");
+    }
+    if (renderDataJson is! Map) {
+      throw CoreError("无法解析直播间页面数据，该直播间可能仅支持手机客户端观看");
+    }
+    var state = renderDataJson["state"];
+    if (state is! Map) {
+      throw CoreError("无法解析直播间页面数据，该直播间可能仅支持手机客户端观看");
+    }
+    return state;
   }
 
   /// 通过webRid获取直播间Web信息
