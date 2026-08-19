@@ -403,12 +403,12 @@ class DouyinSite implements LiveSite {
       roomId: webRid,
       title: room["title"]?.toString() ?? "",
       cover: roomStatus
-          ? room["cover"]?["url_list"]?[0]?.toString() ?? ""
+          ? (room["cover"]?["url_list"]?[0]?.toString() ?? "")
           : "",
       userName: owner?["nickname"]?.toString() ?? "",
       userAvatar: owner?["avatar_thumb"]?["url_list"]?[0]?.toString() ?? "",
       online: roomStatus
-          ? asT<int?>(room["room_view_stats"]?["display_value"]) ?? 0
+          ? (asT<int?>(room["room_view_stats"]?["display_value"]) ?? 0)
           : 0,
       status: roomStatus,
       url: "https://live.douyin.com/$webRid",
@@ -458,18 +458,18 @@ class DouyinSite implements LiveSite {
       roomId: webRid,
       title: roomData["title"]?.toString() ?? "",
       cover: roomStatus
-          ? roomData["cover"]?["url_list"]?[0]?.toString() ?? ""
+          ? (roomData["cover"]?["url_list"]?[0]?.toString() ?? "")
           : "",
       userName: roomStatus
-          ? owner?["nickname"]?.toString() ??
+          ? (owner?["nickname"]?.toString() ??
               userData?["nickname"]?.toString() ??
-              ""
-          : userData?["nickname"]?.toString() ?? "",
+              "")
+          : (userData?["nickname"]?.toString() ?? ""),
       userAvatar: roomStatus
-          ? owner?["avatar_thumb"]?["url_list"]?[0]?.toString() ?? ""
-          : userData?["avatar_thumb"]?["url_list"]?[0]?.toString() ?? "",
+          ? (owner?["avatar_thumb"]?["url_list"]?[0]?.toString() ?? "")
+          : (userData?["avatar_thumb"]?["url_list"]?[0]?.toString() ?? ""),
       online: roomStatus
-          ? asT<int?>(roomData["room_view_stats"]?["display_value"]) ?? 0
+          ? (asT<int?>(roomData["room_view_stats"]?["display_value"]) ?? 0)
           : 0,
       status: roomStatus,
       url: "https://live.douyin.com/$webRid",
@@ -516,18 +516,18 @@ class DouyinSite implements LiveSite {
       roomId: webRid,
       title: room["title"]?.toString() ?? "",
       cover: roomStatus
-          ? room["cover"]?["url_list"]?[0]?.toString() ?? ""
+          ? (room["cover"]?["url_list"]?[0]?.toString() ?? "")
           : "",
       userName: roomStatus
-          ? owner?["nickname"]?.toString() ??
+          ? (owner?["nickname"]?.toString() ??
               anchor?["nickname"]?.toString() ??
-              ""
-          : anchor?["nickname"]?.toString() ?? "",
+              "")
+          : (anchor?["nickname"]?.toString() ?? ""),
       userAvatar: roomStatus
-          ? owner?["avatar_thumb"]?["url_list"]?[0]?.toString() ?? ""
-          : anchor?["avatar_thumb"]?["url_list"]?[0]?.toString() ?? "",
+          ? (owner?["avatar_thumb"]?["url_list"]?[0]?.toString() ?? "")
+          : (anchor?["avatar_thumb"]?["url_list"]?[0]?.toString() ?? ""),
       online: roomStatus
-          ? asT<int?>(room["room_view_stats"]?["display_value"]) ?? 0
+          ? (asT<int?>(room["room_view_stats"]?["display_value"]) ?? 0)
           : 0,
       status: roomStatus,
       url: "https://live.douyin.com/$webRid",
