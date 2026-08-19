@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:simple_live_app/services/device_info_service.dart';
 
-/// 底部 Tab 栏容器：在 iOS 26+ 上渲染原生液态玻璃（Liquid Glass）效果，
+/// 底部 Tab 栏容器：iOS 26+ 渲染为浮动 Dock 样式（仿 iOS 26 桌面 Dock），
 /// 其他平台回退为标准 NavigationBar。
 ///
 /// iOS 26+ 通过 UiKitView 嵌入原生 UIVisualEffectView，原生端运行时加载
-/// `UIGlassEffect` 获得系统级液态玻璃渲染（光线折射 + 自适应着色 + 边缘高光）。
-/// 全宽贴底布局，需配合 Scaffold.extendBody = true 并移除内层 bottom padding，
-/// 使页面内容延伸至 Tab 栏后方，UIGlassEffect 才能折射到滚动内容。
+/// `UIGlassEffect` 获得系统级液态玻璃。Dock 为浮动圆角胶囊，左右留白，
+/// 浮于 home indicator 上方（不贴底），配合 Scaffold.extendBody 与内层
+/// removePadding 使滚动内容延伸至 Dock 后方，UIGlassEffect 得以折射内容。
 class LiquidGlassTabBar extends StatelessWidget {
   final int selectedIndex;
   final ValueChanged<int> onDestinationSelected;
@@ -36,30 +36,52 @@ class LiquidGlassTabBar extends StatelessWidget {
 
     final theme = Theme.of(context);
 
-    // 全宽贴底：UiKitView 填满整个 Tab 栏区域（含底部安全区），
-    // iOS 26+ 渲染真液态玻璃并折射 extendBody 延伸至后方的滚动内容；
-    // NavigationBar 浮于玻璃之上、背景透明，SafeArea 让图标避开 home indicator。
-    return Stack(
-      children: [
-        const Positioned.fill(
-          child: UiKitView(viewType: 'liquid_glass_view'),
-        ),
-        SafeArea(
-          top: false,
-          child: NavigationBar(
-            selectedIndex: selectedIndex,
-            onDestinationSelected: onDestinationSelected,
-            height: 56,
-            labelBehavior: NavigationDestinationLabelBehavior.alwaysHide,
-            backgroundColor: Colors.transparent,
-            elevation: 0,
-            surfaceTintColor: Colors.transparent,
-            // 选中指示器：半透明主色胶囊，与液态玻璃融合
-            indicatorColor: theme.colorScheme.primary.withAlpha(50),
-            destinations: destinations,
+    // iOS 26 浮动 Dock：圆角胶囊，左右留白，浮于 home indicator 上方。
+    // SafeArea(top:false) 仅处理底部 home indicator，Dock 自然位于其上方；
+    // 上下各留 4pt 悬浮间距，避免 Dock 顶到 home indicator 显得局促。
+    return SafeArea(
+      top: false,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 4, 16, 4),
+        child: Container(
+          height: 60,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(28),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withAlpha(28),
+                blurRadius: 20,
+                spreadRadius: 0,
+                offset: const Offset(0, 6),
+              ),
+            ],
+          ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(28),
+            child: Stack(
+              children: [
+                // 原生 UIVisualEffectView — iOS 26+ 渲染 UIGlassEffect 真液态玻璃
+                const Positioned.fill(
+                  child: UiKitView(viewType: 'liquid_glass_view'),
+                ),
+                // NavigationBar 浮于玻璃之上，背景透明，仅保留图标与指示器
+                NavigationBar(
+                  selectedIndex: selectedIndex,
+                  onDestinationSelected: onDestinationSelected,
+                  height: 60,
+                  labelBehavior: NavigationDestinationLabelBehavior.alwaysHide,
+                  backgroundColor: Colors.transparent,
+                  elevation: 0,
+                  surfaceTintColor: Colors.transparent,
+                  // 选中指示器：半透明主色胶囊，与液态玻璃融合
+                  indicatorColor: theme.colorScheme.primary.withAlpha(50),
+                  destinations: destinations,
+                ),
+              ],
+            ),
           ),
         ),
-      ],
+      ),
     );
   }
 }
