@@ -48,8 +48,13 @@ class SyncService extends GetxService {
 
   /// 监听其他端UDP广播的回复
   void listenUDP() async {
-    udp = await UDP.bind(Endpoint.any(port: const Port(udpPort)));
-    udp!.asStream().listen(listenUdp);
+    try {
+      udp = await UDP.bind(Endpoint.any(port: const Port(udpPort)));
+      udp!.asStream().listen(listenUdp);
+    } catch (e) {
+      // 端口被占用（如多开时已有实例监听），降级跳过UDP同步，不影响主功能
+      Log.logPrint(e);
+    }
   }
 
   void listenUdp(Datagram? datagram) {

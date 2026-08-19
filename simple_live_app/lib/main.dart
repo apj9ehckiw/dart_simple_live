@@ -51,11 +51,18 @@ void main() async {
   await RustLib.init();
   await MigrationService.migrateData();
   MediaKit.ensureInitialized();
-  await Hive.initFlutter(
-    (!Platform.isAndroid && !Platform.isIOS)
-        ? (await getApplicationSupportDirectory()).path
-        : null,
-  );
+
+  // Windows 等桌面端支持多开：hive_ce 打开 box 时会获取跨进程文件锁，
+  // 若已有实例在运行，第二个实例会永久阻塞在 Hive.openBox。
+  // 因此检测到已有实例时，改用独立的数据目录，实现多开且互不干扰。
+  String? hivePath;
+  if (!Platform.isAndroid && !Platform.isIOS) {
+    final appDir = await getApplicationSupportDirectory();
+    hivePath = await _isSecondaryInstance(appDir.path)
+        ? '${appDir.path}${Platform.pathSeparator}slive_secondary'
+        : appDir.path;
+  }
+  await Hive.initFlutter(hivePath);
   //初始化服务
   await initServices();
   await initWindow();
@@ -70,6 +77,35 @@ void main() async {
   );
   SystemChrome.setSystemUIOverlayStyle(systemUiOverlayStyle);
   runApp(const MyApp());
+}
+
+/// 持有首个实例的锁文件句柄，防止被 GC 回收后文件锁被释放。
+RandomAccessFile? _instanceLock;
+
+/// 检测当前是否为后续（多开）实例。
+///
+/// 通过在应用数据目录创建互斥锁文件并尝试获取独占锁（带超时）来判断：
+/// - 获取成功 → 首个实例，持续持有该锁直到进程退出；
+/// - 获取失败/超时 → 已有实例在运行，当前为多开实例。
+Future<bool> _isSecondaryInstance(String appDirPath) async {
+  final lockFile =
+      File('$appDirPath${Platform.pathSeparator}slive_instance.lock');
+  try {
+    // FileMode.append 不会截断文件内容，避免影响其他实例的锁状态
+    final raf = await lockFile.open(mode: FileMode.append);
+    try {
+      await raf.lock(FileLock.exclusive).timeout(const Duration(seconds: 2));
+      // 获取锁成功 → 首个实例，持有锁句柄防止释放
+      _instanceLock = raf;
+      return false;
+    } catch (_) {
+      // 锁被其他实例占用 → 后续实例
+      await raf.close();
+      return true;
+    }
+  } catch (_) {
+    return false;
+  }
 }
 
 Future initWindow() async {
