@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:simple_live_app/app/app_style.dart';
 import 'package:simple_live_app/services/device_info_service.dart';
+import 'package:simple_live_app/widgets/animated_indexed_stack.dart';
 import 'package:simple_live_app/widgets/liquid_glass_tab_bar.dart';
 
 import 'indexed_controller.dart';
@@ -59,7 +60,7 @@ class IndexedPage extends GetView<IndexedController> {
                               : BorderSide.none,
                         ),
                       ),
-                      child: IndexedStack(
+                      child: AnimatedIndexedStack(
                         index: controller.index.value,
                         children: controller.pages,
                       ),
@@ -75,13 +76,11 @@ class IndexedPage extends GetView<IndexedController> {
               () => LiquidGlassTabBar(
                 selectedIndex: controller.index.value,
                 onDestinationSelected: controller.setIndex,
-                destinations: controller.items
-                    .map(
-                      (item) => NavigationDestination(
-                        icon: Icon(item.iconData),
-                        label: item.title,
-                      ),
-                    )
+                items: controller.items
+                    .map((item) => LiquidGlassTabItem(
+                          icon: item.iconData,
+                          label: item.title,
+                        ))
                     .toList(),
               ),
             ),
