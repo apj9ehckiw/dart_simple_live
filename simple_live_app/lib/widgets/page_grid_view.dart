@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:simple_live_app/app/controller/base_controller.dart';
+import 'package:simple_live_app/widgets/liquid_glass_dock_scope.dart';
 import 'package:simple_live_app/widgets/status/app_empty_widget.dart';
 import 'package:simple_live_app/widgets/status/app_error_widget.dart';
 import 'package:simple_live_app/widgets/status/app_loadding_widget.dart';
@@ -33,6 +34,15 @@ class PageGridView extends StatelessWidget {
     super.key,
   });
 
+  /// 在 iOS 26+ 液态玻璃模式下，为滚动内容底部追加 Dock 栏高度空间，
+  /// 避免滚动到底部时最后一项被 Dock 遮挡。
+  EdgeInsets _effectivePadding(BuildContext context) {
+    final inset = LiquidGlassDockScope.of(context);
+    if (inset == 0) return padding ?? EdgeInsets.zero;
+    return (padding ?? EdgeInsets.zero)
+        .copyWith(bottom: (padding?.bottom ?? 0) + inset);
+  }
+
   @override
   Widget build(BuildContext context) {
     return Obx(
@@ -51,7 +61,7 @@ class PageGridView extends StatelessWidget {
             onLoad: pageController.loadData,
             onRefresh: pageController.refreshData,
             child: MasonryGridView.count(
-              padding: padding,
+              padding: _effectivePadding(context),
               itemCount: pageController.list.length,
               itemBuilder: itemBuilder,
               crossAxisCount: crossAxisCount,

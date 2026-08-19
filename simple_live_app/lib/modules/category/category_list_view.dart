@@ -6,6 +6,7 @@ import 'package:simple_live_app/app/app_style.dart';
 import 'package:simple_live_app/modules/category/category_list_controller.dart';
 import 'package:simple_live_app/routes/app_navigation.dart';
 import 'package:simple_live_app/widgets/keep_alive_wrapper.dart';
+import 'package:simple_live_app/widgets/liquid_glass_dock_scope.dart';
 import 'package:simple_live_app/widgets/net_image.dart';
 import 'package:simple_live_app/widgets/shadow_card.dart';
 import 'package:simple_live_core/simple_live_core.dart';
@@ -28,7 +29,11 @@ class CategoryListView extends StatelessWidget {
             completeDuration: const Duration(milliseconds: 400),
           ),
           child: ListView.builder(
-            padding: AppStyle.edgeInsetsA12,
+            padding: AppStyle.edgeInsetsA12.copyWith(
+              // iOS 26+ 液态玻璃 Dock 栏底部预留空间
+              bottom: AppStyle.edgeInsetsA12.bottom +
+                  LiquidGlassDockScope.of(context),
+            ),
             itemCount: controller.list.length,
             controller: controller.scrollController,
             itemBuilder: (_, i) {

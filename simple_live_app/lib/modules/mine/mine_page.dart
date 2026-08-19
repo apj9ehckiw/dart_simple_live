@@ -8,6 +8,7 @@ import 'package:simple_live_app/app/log.dart';
 import 'package:simple_live_app/app/utils.dart';
 import 'package:simple_live_app/routes/route_path.dart';
 import 'package:simple_live_app/services/signalr_service.dart';
+import 'package:simple_live_app/widgets/liquid_glass_dock_scope.dart';
 import 'package:url_launcher/url_launcher_string.dart';
 
 class MinePage extends StatelessWidget {
@@ -25,7 +26,11 @@ class MinePage extends StatelessWidget {
             ),
       child: SafeArea(
         child: ListView(
-          padding: AppStyle.edgeInsetsA4,
+          padding: AppStyle.edgeInsetsA4.copyWith(
+            // iOS 26+ 液态玻璃 Dock 栏底部预留空间
+            bottom: AppStyle.edgeInsetsA4.bottom +
+                LiquidGlassDockScope.of(context),
+          ),
           children: [
             AppStyle.vGap12,
             ListTile(
