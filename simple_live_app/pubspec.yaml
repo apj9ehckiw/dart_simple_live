@@ -130,6 +130,9 @@ dependency_overrides:
       url: https://github.com/Predidit/media-kit.git
       ref: 994465d9bfca3f39d0b41199d16e7fd93fe97881
       path: ./libs/macos/media_kit_libs_macos_video
+  # 本地补丁版 hive_ce：支持多进程共享同一数据库（打开不阻塞、写时加锁）
+  hive_ce:
+    path: packages/hive_ce
 
 dev_dependencies:
   flutter_lints: ^6.0.0

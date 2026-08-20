@@ -849,6 +849,18 @@ class FollowService extends GetxService {
     }
   }
 
+  /// 多开实例同步：数据库 box 重建后，从数据库重新加载关注数据并刷新界面。
+  /// 与 initFollowList 不同，不做快照恢复，直接反映数据库最新内容。
+  Future<void> refreshFromDb() async {
+    final list = DBService.instance.getFollowList();
+    followList.assignAll(list);
+    _buildDormantList();
+    getAllTagList();
+    liveList.assignAll(followList.where((x) => x.liveStatus.value == 2));
+    notLiveList.assignAll(followList.where((x) => x.liveStatus.value == 1));
+    _updatedListController.add(0);
+  }
+
   @override
   void onClose() {
     updateTimer?.cancel();

@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:fractional_indexing_dart/fractional_indexing_dart.dart';
 import 'package:get/get.dart';
 import 'package:hive_ce/hive_ce.dart';
+import 'package:simple_live_app/app/log.dart';
 import 'package:simple_live_app/models/db/follow_user.dart';
 import 'package:simple_live_app/models/db/follow_user_tag.dart';
 import 'package:simple_live_app/models/db/history.dart';
@@ -15,9 +16,34 @@ class DBService extends GetxService {
   late Box<FollowUserTag> tagBox;
 
   Future init() async {
+    await _openBoxes();
+  }
+
+  Future _openBoxes() async {
     historyBox = await Hive.openBox("History");
     followBox = await Hive.openBox("FollowUser");
     tagBox = await Hive.openBox("FollowUserTag");
+  }
+
+  /// 重新打开所有 box。多实例共享数据时，检测到其他实例修改了数据
+  /// 文件后调用，使本地读到最新数据。
+  Future<void> reload() async {
+    try {
+      await historyBox.close();
+    } catch (e) {
+      Log.logPrint(e);
+    }
+    try {
+      await followBox.close();
+    } catch (e) {
+      Log.logPrint(e);
+    }
+    try {
+      await tagBox.close();
+    } catch (e) {
+      Log.logPrint(e);
+    }
+    await _openBoxes();
   }
 
   Future<void> clearFollowTag() async {

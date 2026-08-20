@@ -36,6 +36,7 @@ import 'package:simple_live_app/services/follow_service.dart';
 import 'package:simple_live_app/services/history_service.dart';
 import 'package:simple_live_app/services/local_storage_service.dart';
 import 'package:simple_live_app/services/migration_service.dart';
+import 'package:simple_live_app/services/multi_instance_sync_service.dart';
 import 'package:simple_live_app/services/sync_service.dart';
 import 'package:simple_live_app/services/window_service.dart';
 import 'package:simple_live_app/src/rust/frb_generated.dart';
@@ -52,19 +53,21 @@ void main() async {
   await MigrationService.migrateData();
   MediaKit.ensureInitialized();
 
-  // Windows 等桌面端支持多开：hive_ce 打开 box 时会获取跨进程文件锁，
-  // 若已有实例在运行，第二个实例会永久阻塞在 Hive.openBox。
-  // 因此检测到已有实例时，改用独立的数据目录，实现多开且互不干扰。
+  // Windows 等桌面端支持多开：所有实例共享同一数据目录。
+  // 本地补丁版 hive_ce 支持多进程同时打开 box（写操作通过文件锁互斥），
+  // 应用层通过 MultiInstanceSyncService 检测外部数据变更并刷新界面，
+  // 保证多开实例之间数据一致。
   String? hivePath;
   if (!Platform.isAndroid && !Platform.isIOS) {
-    final appDir = await getApplicationSupportDirectory();
-    hivePath = await _isSecondaryInstance(appDir.path)
-        ? '${appDir.path}${Platform.pathSeparator}slive_secondary'
-        : appDir.path;
+    hivePath = (await getApplicationSupportDirectory()).path;
   }
   await Hive.initFlutter(hivePath);
   //初始化服务
   await initServices();
+  // 多开数据同步：监听其他实例对共享数据的修改并刷新本地界面
+  if (hivePath != null) {
+    MultiInstanceSyncService.instance.start(hivePath);
+  }
   await initWindow();
 
   await MigrationService.migrateDataByVersion();
@@ -77,35 +80,6 @@ void main() async {
   );
   SystemChrome.setSystemUIOverlayStyle(systemUiOverlayStyle);
   runApp(const MyApp());
-}
-
-/// 持有首个实例的锁文件句柄，防止被 GC 回收后文件锁被释放。
-RandomAccessFile? _instanceLock;
-
-/// 检测当前是否为后续（多开）实例。
-///
-/// 通过在应用数据目录创建互斥锁文件并尝试获取独占锁（带超时）来判断：
-/// - 获取成功 → 首个实例，持续持有该锁直到进程退出；
-/// - 获取失败/超时 → 已有实例在运行，当前为多开实例。
-Future<bool> _isSecondaryInstance(String appDirPath) async {
-  final lockFile =
-      File('$appDirPath${Platform.pathSeparator}slive_instance.lock');
-  try {
-    // FileMode.append 不会截断文件内容，避免影响其他实例的锁状态
-    final raf = await lockFile.open(mode: FileMode.append);
-    try {
-      await raf.lock(FileLock.exclusive).timeout(const Duration(seconds: 2));
-      // 获取锁成功 → 首个实例，持有锁句柄防止释放
-      _instanceLock = raf;
-      return false;
-    } catch (_) {
-      // 锁被其他实例占用 → 后续实例
-      await raf.close();
-      return true;
-    }
-  } catch (_) {
-    return false;
-  }
 }
 
 Future initWindow() async {
@@ -141,6 +115,9 @@ Future initServices() async {
   Get.put(FollowService());
 
   Get.put(HistoryService());
+
+  // 多开实例数据同步（桌面端）
+  Get.put(MultiInstanceSyncService());
 
   // 移动平台不使用 windowManager
   if (!Platform.isAndroid && !Platform.isIOS) {
