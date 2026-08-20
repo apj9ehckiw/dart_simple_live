@@ -851,8 +851,24 @@ class FollowService extends GetxService {
 
   /// 多开实例同步：数据库 box 重建后，从数据库重新加载关注数据并刷新界面。
   /// 与 initFollowList 不同，不做快照恢复，直接反映数据库最新内容。
+  ///
+  /// liveStatus/cover/title/online 是内存态（不持久化到 Hive），box 重建
+  /// 后新对象会被重置为默认值。这里先从旧列表保存这些状态，再复制到
+  /// 新对象，避免多开同步刷新后直播状态丢失、右侧列表空白。
   Future<void> refreshFromDb() async {
+    final oldMap = <String, FollowUser>{
+      for (final u in followList) u.id: u,
+    };
     final list = DBService.instance.getFollowList();
+    for (final item in list) {
+      final old = oldMap[item.id];
+      if (old != null) {
+        item.liveStatus.value = old.liveStatus.value;
+        item.cover.value = old.cover.value;
+        item.title.value = old.title.value;
+        item.online.value = old.online.value;
+      }
+    }
     followList.assignAll(list);
     _buildDormantList();
     getAllTagList();

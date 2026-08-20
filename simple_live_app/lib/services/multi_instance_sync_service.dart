@@ -53,7 +53,8 @@ class MultiInstanceSyncService extends GetxService {
     final dir = _hiveDir;
     if (dir == null) return;
 
-    var changed = false;
+    var dbChanged = false;
+    var followChanged = false;
     for (final name in _boxNames) {
       final file = File('$dir${Platform.pathSeparator}$name.hive');
       try {
@@ -61,7 +62,13 @@ class MultiInstanceSyncService extends GetxService {
         final size = await file.length();
         final last = _lastSizes[name];
         if (last != null && last != size) {
-          changed = true;
+          dbChanged = true;
+          // 仅关注相关数据变化时需要刷新关注列表界面；
+          // 历史记录变化（如本实例进入直播间写入观看记录）只重建 box，
+          // 避免重建导致关注列表直播状态重置、右侧列表空白。
+          if (name == 'followuser' || name == 'followusertag') {
+            followChanged = true;
+          }
         }
         _lastSizes[name] = size;
       } catch (e) {
@@ -69,17 +76,19 @@ class MultiInstanceSyncService extends GetxService {
       }
     }
 
-    if (changed) {
-      await _reloadData();
+    if (dbChanged) {
+      await _reloadData(followChanged);
     }
   }
 
-  /// 重建数据库连接并刷新各业务服务的数据。
-  Future<void> _reloadData() async {
+  /// 重建数据库连接，并按需刷新各业务服务的数据。
+  Future<void> _reloadData(bool refreshFollow) async {
     try {
       await DBService.instance.reload();
-      // 刷新关注列表等界面数据
-      await FollowService.instance.refreshFromDb();
+      if (refreshFollow) {
+        // 刷新关注列表等界面数据（保留原有直播状态）
+        await FollowService.instance.refreshFromDb();
+      }
     } catch (e) {
       Log.logPrint(e);
     }
