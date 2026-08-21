@@ -129,7 +129,11 @@ class FollowUserController extends BasePageController<FollowUser> {
     }
 
     if (hideOffline && filterMode.value.tag != "未开播") {
-      list.retainWhere((user) => user.liveStatus.value == 2);
+      // 保留直播中(2)和状态未知(0)的用户：
+      // 状态未知（如多开同步后尚未刷新）时不应被误隐藏，
+      // 否则列表会被全部过滤导致页面白屏，等状态更新后再过滤。
+      list.retainWhere((user) =>
+          user.liveStatus.value == 2 || user.liveStatus.value == 0);
     }
 
     // 同步空白遮罩状态。filterData 可能由 stream 事件在 loadData 之后触发，

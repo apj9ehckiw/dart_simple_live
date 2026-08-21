@@ -66,6 +66,9 @@ class FollowService extends GetxService {
 
   Timer? updateTimer;
 
+  /// 状态未知用户触发全量状态更新的频率限制（防风控）
+  DateTime? _lastStatusUpdate;
+
   int _totalToUpdate = 0;
 
   int _refreshCycle = 0;
@@ -856,8 +859,13 @@ class FollowService extends GetxService {
   /// 后新对象会被重置为默认值。这里先从旧列表保存这些状态，再复制到
   /// 新对象，避免多开同步刷新后直播状态丢失、右侧列表空白。
   Future<void> refreshFromDb() async {
+    // 从所有列表合并旧状态，避免 followList 局部为空时状态丢失
     final oldMap = <String, FollowUser>{
       for (final u in followList) u.id: u,
+      for (final u in liveList) u.id: u,
+      for (final u in notLiveList) u.id: u,
+      for (final u in dormantFollowList) u.id: u,
+      for (final u in curTagFollowList) u.id: u,
     };
     final list = DBService.instance.getFollowList();
     for (final item in list) {
@@ -875,6 +883,19 @@ class FollowService extends GetxService {
     liveList.assignAll(followList.where((x) => x.liveStatus.value == 2));
     notLiveList.assignAll(followList.where((x) => x.liveStatus.value == 1));
     _updatedListController.add(0);
+
+    // 存在状态未知（liveStatus==0）的用户时，触发一次直播状态更新，
+    // 避免关注列表（尤其是直播中/未开播 tab）长时间空白。
+    // 带频率限制防止频繁调用 API 触发风控。
+    if (followList.any((x) => x.liveStatus.value == 0)) {
+      final now = DateTime.now();
+      if (_lastStatusUpdate == null ||
+          now.difference(_lastStatusUpdate!) >
+              const Duration(minutes: 1)) {
+        _lastStatusUpdate = now;
+        loadData();
+      }
+    }
   }
 
   @override
