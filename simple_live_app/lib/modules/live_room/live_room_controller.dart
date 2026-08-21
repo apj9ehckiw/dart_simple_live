@@ -549,6 +549,10 @@ class LiveRoomController extends PlayerController with WidgetsBindingObserver {
     // 遍历线路，如果全部链接都断开就是直播结束了
     if (playUrls.length - 1 == currentLineIndex) {
       liveStatus.value = false;
+      // 主播已下播，同步更新关注列表中该主播的直播状态，
+      // 使其从右侧直播中列表移除
+      FollowService.instance
+          .updateLiveStatus("${site.id}_$roomId", 1);
     } else {
       changePlayLine(currentLineIndex + 1);
 

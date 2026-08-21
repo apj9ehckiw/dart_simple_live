@@ -852,6 +852,20 @@ class FollowService extends GetxService {
     }
   }
 
+  /// 更新指定关注用户的直播状态（同步，不查询API）。
+  /// 用于下播检测等场景，如主播下播后标记为未直播并从直播列表移除。
+  void updateLiveStatus(String id, int status) {
+    final user = followList.firstWhereOrNull((u) => u.id == id);
+    if (user == null) return;
+    user.liveStatus.value = status;
+    if (status == 1) {
+      // 下播后封面置空，与 updateLiveInformation 行为一致
+      user.cover.value = "";
+    }
+    liveListSort();
+    _updatedListController.add(0);
+  }
+
   /// 多开实例同步：数据库 box 重建后，从数据库重新加载关注数据并刷新界面。
   /// 与 initFollowList 不同，不做快照恢复，直接反映数据库最新内容。
   ///
@@ -880,8 +894,9 @@ class FollowService extends GetxService {
     followList.assignAll(list);
     _buildDormantList();
     getAllTagList();
-    liveList.assignAll(followList.where((x) => x.liveStatus.value == 2));
-    notLiveList.assignAll(followList.where((x) => x.liveStatus.value == 1));
+    // 重建列表并保持用户设置的排序（观看时长/平台等），
+    // 避免 box 重建后 followList 顺序退化为数据库存储顺序
+    liveListSort();
     _updatedListController.add(0);
 
     // 存在状态未知（liveStatus==0）的用户时，触发一次直播状态更新，
